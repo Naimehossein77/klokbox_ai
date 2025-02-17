@@ -96,7 +96,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
 
         print(media.length);
 
-        if (media.isEmpty) {
+        if (media.isEmpty || page > 2) {
           hasMore = false;
           break;
         }
@@ -136,7 +136,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
               } finally {
                 if (await file.exists()) {
                   print(file.path);
-                   await file.delete();
+                  await file.delete();
                 }
               }
             }
