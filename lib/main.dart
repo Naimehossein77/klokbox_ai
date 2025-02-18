@@ -130,7 +130,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
                 );
                 if (bytes != null) {
                   List<double> feature = await extractFeatureVector(bytes);
-                  await storeFeatureInDatabase(asset.id, file.path, feature);
+                  await storeFeatureInDatabase(asset.id, asset.id, feature);
                 }
                 print('object');
               } finally {
@@ -325,6 +325,27 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   }
 }
 
+Future<File?> getFilePathFromId(String id) async {
+  List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
+    type: RequestType.image,
+  );
+
+  for (var album in albums) {
+    List<AssetEntity> media = await album.getAssetListRange(
+      start: 0,
+      end: await album.assetCountAsync,
+    );
+
+    for (var asset in media) {
+      if (asset.id == id) {
+        File? file = await asset.originFile;
+        return file;
+      }
+    }
+  }
+  return null;
+}
+
 class CardItem extends StatelessWidget {
   const CardItem({
     super.key,
@@ -336,9 +357,20 @@ class CardItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      title: _similarImage.path.isNotEmpty
-          ? Image.file(File(_similarImage.path))
-          : Text("Image not found"),
+      title: FutureBuilder(
+          future: getFilePathFromId(_similarImage.path),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.done) {
+              File? imageFile = snapshot.data as File?;
+              if (imageFile != null) {
+                return Image.file(imageFile);
+              } else {
+                return Text("Image not found");
+              }
+            } else {
+              return CircularProgressIndicator();
+            }
+          }),
       subtitle:
           Text("Similarity: ${_similarImage.similarity.toStringAsFixed(2)}"),
     );
