@@ -53,7 +53,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
 
   Future<void> loadModel(context) async {
     try {
-      _interpreter = await Interpreter.fromAsset('assets/mobilenet_v2.tflite');
+      _interpreter = await Interpreter.fromAsset('assets/effecientnet.tflite');
       print('Model loaded successfully');
     } catch (e) {
       print('Error loading model: $e');
@@ -64,7 +64,6 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   }
 
   Future<void> initializeDatabase() async {
-    // await deleteDatabase(join(await getDatabasesPath(), 'image_features.db'));
     _database = await openDatabase(
       join(await getDatabasesPath(), 'image_features.db'),
       onCreate: (db, version) {
@@ -81,17 +80,13 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     final PermissionState permission =
         await PhotoManager.requestPermissionExtend();
     if (permission.isAuth) {
-      // Get all albums
       List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
-        type: RequestType.image, // Only get images
+        type: RequestType.image,
       );
 
       if (albums.isEmpty) return;
 
-      // Get recent album (usually "Recent" or "All Photos")
       final recentAlbum = albums[0];
-
-      // Load all images in chunks to avoid memory issues
       int page = 0;
       const int pageSize = 50;
       bool hasMore = true;
@@ -102,8 +97,6 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
           size: pageSize,
         );
 
-        print(media.length);
-
         if (media.isEmpty || page > 2) {
           hasMore = false;
           break;
@@ -111,7 +104,6 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
 
         for (var asset in media) {
           try {
-            // Check if the feature is already stored in the database
             List<Map<String, dynamic>> existingFeature = await _database!.query(
               'features',
               where: 'id = ?',
@@ -123,7 +115,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
               });
             }
             if (existingFeature.isNotEmpty) {
-              continue; // Skip if feature already exists
+              continue;
             }
 
             File? file = await asset.file;
@@ -140,19 +132,12 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
                   List<double> feature = await extractFeatureVector(bytes);
                   await storeFeatureInDatabase(asset.id, asset.id, feature);
                 }
-                print('object');
               } finally {
                 if (await file.exists()) {
-                  print(file.path);
                   await file.delete();
                 }
               }
             }
-            // if (file != null) {
-            //   Uint8List bytes = await file.readAsBytes();
-            //   List<double> feature = await extractFeatureVector(bytes);
-            //   await storeFeatureInDatabase(asset.id, file.path, feature);
-            // }
           } catch (e) {
             print('Error processing image ${(await asset.file)!.path}: $e');
             continue;
@@ -232,30 +217,23 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   }
 
   Future<List<double>> extractFeatureVector(Uint8List imageData) async {
-    // if (_interpreter == null) {
-    //   if (_interpreter == null) throw Exception('Model is not loaded');
-    // }
     Float32List input = preprocessImage(imageData);
     var inputTensor = input.buffer.asFloat32List().reshape([1, 224, 224, 3]);
-    var outputBuffer = List.filled(1001, 0.0).reshape([1, 1001]);
+    var outputBuffer = List.filled(1280, 0.0).reshape([1, 1280]);
     try {
       _interpreter!.run(inputTensor, outputBuffer);
     } on Exception catch (e) {
-      // TODO
       Fluttertoast.showToast(msg: "Error: $e");
     }
 
-    // Normalize the output vector
     List<double> features = List<double>.from(outputBuffer[0]);
     double maxVal = features.reduce(max);
     double minVal = features.reduce(min);
 
-    // Normalize to range [0,1]
     if (maxVal != minVal) {
       features = features.map((e) => (e - minVal) / (maxVal - minVal)).toList();
     }
 
-    // print('Feature vector length: ${features}');
     return features;
   }
 
@@ -267,12 +245,8 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
       dotProduct += vectorA[i] * vectorB[i];
       normA += vectorA[i] * vectorA[i];
       normB += vectorB[i] * vectorB[i];
-      // print(normB);
     }
-    // print(normA);
-    // print(normB);
     double norm = (sqrt(normA) * sqrt(normB));
-    // debugPrint('Norm: $norm');
     if (norm == 0) {
       return 0.0;
     }
@@ -283,17 +257,11 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   Future<void> findSimilarImages() async {
     if (_queryFeature == null) return;
     List<Map<String, dynamic>> maps = await _database!.query('features');
-    // print(maps);
     List<SimilarImage> results = [];
-    // _queryFeature = bytesToFeature(featureToBytes(_queryFeature!));
     for (var map in maps) {
       List<double> feature =
           (jsonDecode(map['feature']) as List).cast<double>();
-      // print('Feature length: ${feature.length}');
-      // print('Query feature length: ${_queryFeature?.length}');
-      // print(feature);
       double similarity = cosineSimilarity(_queryFeature!, feature);
-      // print(similarity);
       if (similarity > 0.15) {
         results.add(SimilarImage(path: map['path'], similarity: similarity));
       }
