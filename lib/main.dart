@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
@@ -42,16 +43,23 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   @override
   void initState() {
     super.initState();
-    loadModel();
-    initializeDatabase();
+    init(context);
   }
 
-  Future<void> loadModel() async {
+  init(context) async {
+    await loadModel(context);
+    await initializeDatabase();
+  }
+
+  Future<void> loadModel(context) async {
     try {
       _interpreter = await Interpreter.fromAsset('assets/mobilenet_v2.tflite');
       print('Model loaded successfully');
     } catch (e) {
       print('Error loading model: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading model: $e')),
+      );
     }
   }
 
@@ -167,29 +175,37 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     );
   }
 
-  Future<void> pickImage() async {
-    final XFile? imageFile =
-        await _picker.pickImage(source: ImageSource.gallery);
-    if (imageFile != null) {
-      final file = File(imageFile.path);
-      final bytes;
-      Uint8List? compressedBytes = await FlutterImageCompress.compressWithFile(
-        file.path,
-        minWidth: 224,
-        minHeight: 224,
-        quality: 85,
-      );
-      if (compressedBytes != null) {
-        bytes = compressedBytes;
-      } else {
-        bytes = await file.readAsBytes();
+  Future<void> pickImage(BuildContext context) async {
+    try {
+      final XFile? imageFile =
+          await _picker.pickImage(source: ImageSource.gallery);
+      if (imageFile != null) {
+        final file = File(imageFile.path);
+        var bytes;
+        Uint8List? compressedBytes =
+            await FlutterImageCompress.compressWithFile(
+          file.path,
+          minWidth: 224,
+          minHeight: 224,
+          quality: 85,
+        );
+        if (compressedBytes != null) {
+          bytes = compressedBytes;
+        } else {
+          bytes = await file.readAsBytes();
+        }
+        setState(() {
+          _queryFeature = null;
+          _similarImages = [];
+        });
+        await loadModel(context);
+        _queryFeature = await extractFeatureVector(bytes);
+        findSimilarImages();
       }
-      setState(() {
-        _queryFeature = null;
-        _similarImages = [];
-      });
-      _queryFeature = await extractFeatureVector(bytes);
-      findSimilarImages();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error picking image: $e')),
+      );
     }
   }
 
@@ -216,13 +232,18 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   }
 
   Future<List<double>> extractFeatureVector(Uint8List imageData) async {
-    if (_interpreter == null) {
-      throw Exception('Model is not loaded');
-    }
+    // if (_interpreter == null) {
+    //   if (_interpreter == null) throw Exception('Model is not loaded');
+    // }
     Float32List input = preprocessImage(imageData);
     var inputTensor = input.buffer.asFloat32List().reshape([1, 224, 224, 3]);
     var outputBuffer = List.filled(1001, 0.0).reshape([1, 1001]);
-    _interpreter!.run(inputTensor, outputBuffer);
+    try {
+      _interpreter!.run(inputTensor, outputBuffer);
+    } on Exception catch (e) {
+      // TODO
+      Fluttertoast.showToast(msg: "Error: $e");
+    }
 
     // Normalize the output vector
     List<double> features = List<double>.from(outputBuffer[0]);
@@ -304,18 +325,21 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
         children: [
           SizedBox(height: 20),
           ElevatedButton(
-            onPressed: pickImage,
+            onPressed: () => pickImage(context),
             child: Text("Pick an Image"),
           ),
           SizedBox(height: 20),
           Expanded(
             child: _similarImages.isEmpty
-                ? Center(child: Text("No similar images found."))
+                ? Center(
+                    child: Text(
+                        "No similar images found. ${_similarImages.length}"))
                 : ListView.builder(
                     itemCount: _similarImages.length,
                     itemBuilder: (context, index) {
                       // File imageFile = File(_similarImages[index].path);
                       return CardItem(similarImage: _similarImages[index]);
+                      // Text(_similarImages[index].path);
                     },
                   ),
           ),

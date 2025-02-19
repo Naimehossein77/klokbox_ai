@@ -10,8 +10,8 @@
 	<string>We need access to your microphone to allow you to record audio.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We need access to your location to provide location-based services.</string>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>We need access to Bluetooth to connect to nearby devices.</string>
+	<!-- <key>NSBluetoothAlwaysUsageDescription</key>
+	<string>We need access to Bluetooth to connect to nearby devices.</string> -->
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
