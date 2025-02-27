@@ -151,17 +151,17 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
                       await extractFeatureVector(bytes);
                   await storeFeatureInDatabase(
                       asset.id, asset.id, feature);
-                  List<Uint8List> faceImages =
-                      await cropFaces(file.path);
+                  // List<Uint8List> faceImages =
+                  //     await cropFaces(file.path);
 
-                  for (int i = 0; i < faceImages.length; i++) {
+                  // for (int i = 0; i < faceImages.length; i++) {
                     List<double> faceFeature =
                         await extractFaceEmbeddings(
-                            preprocessImage(faceImages[i]));
+                            preprocessImage(bytes));
                     print(faceFeature);
                     await storeFaceFeatureInDB(
-                        '${asset.id}_face_$i', asset.id, faceFeature);
-                  }
+                        '${asset.id}_face_1', asset.id, faceFeature);
+                  // }
                 }
               } finally {
                 if (await file.exists()) {
