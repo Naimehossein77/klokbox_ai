@@ -151,17 +151,17 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
                       await extractFeatureVector(bytes);
                   await storeFeatureInDatabase(
                       asset.id, asset.id, feature);
-                  // List<Uint8List> faceImages =
-                  //     await cropFaces(file.path);
+                  List<Uint8List> faceImages =
+                      await cropFaces(bytes);
 
-                  // for (int i = 0; i < faceImages.length; i++) {
+                  for (int i = 0; i < faceImages.length; i++) {
                     List<double> faceFeature =
                         await extractFaceEmbeddings(
-                            preprocessImage(bytes));
+                            preprocessImage(faceImages[i]));
                     print(faceFeature);
                     await storeFaceFeatureInDB(
-                        '${asset.id}_face_1', asset.id, faceFeature);
-                  // }
+                        '${asset.id}_face_$i', asset.id, faceFeature);
+                  }
                 }
               } finally {
                 if (await file.exists()) {
@@ -345,7 +345,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
           _similarImages = [];
         });
         _queryFeature = await extractFeatureVector(bytes);
-
+        
         findSimilarImages();
       }
     } catch (e) {

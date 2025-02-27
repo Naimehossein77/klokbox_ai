@@ -1,16 +1,20 @@
 import 'dart:io';
 import 'dart:typed_data';
-
-import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
 
 // Add this method to your FaceRecognitionService class
-Future<List<Uint8List>> cropFaces(String filePath) async {
+Future<List<Uint8List>> cropFaces(Uint8List imageBytes) async {
   try {
-    final img.Image? originalImage = img.decodeImage(File(filePath).readAsBytesSync());
-    if (originalImage == null) {
-      throw Exception('Failed to decode image');
+    final img.Image? originalImage;
+    try {
+      originalImage = img.decodeImage(imageBytes);
+      if (originalImage == null) {
+        throw Exception('Failed to decode image');
+      }
+    } catch (e) {
+      // throw Exception('Failed to read or decode image: $e');
+      rethrow;
     }
 
     // if (originalImage == null) {
@@ -30,6 +34,10 @@ Future<List<Uint8List>> cropFaces(String filePath) async {
     //     bytesPerRow: originalImage.width,
     //   ),
     // );
+    final tempDir = await Directory.systemTemp.createTemp();
+    final filePath = '${tempDir.path}/temp_image.jpg';
+    final file = File(filePath);
+    await file.writeAsBytes(imageBytes);
     final inputImage = InputImage.fromFilePath(filePath);
     final faceDetector = FaceDetector(
       options: FaceDetectorOptions(
@@ -39,11 +47,15 @@ Future<List<Uint8List>> cropFaces(String filePath) async {
       ),
     );
 
-    final List<Face> faces =
-        await faceDetector.processImage(inputImage);
+    final stopwatch = Stopwatch()..start();
+    final List<Face> faces = await faceDetector.processImage(inputImage);
+    stopwatch.stop();
+    print('Face detection took: ${stopwatch.elapsedMilliseconds} ms');
 
     if (faces.isEmpty) {
       throw Exception('No faces detected in the image');
+    } else {
+      print('Detected ${faces.length} faces');
     }
 
     // Crop each face
