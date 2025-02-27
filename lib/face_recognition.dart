@@ -6,26 +6,31 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
 
 // Add this method to your FaceRecognitionService class
-Future<List<Uint8List>> cropFaces(Uint8List imageBytes) async {
+Future<List<Uint8List>> cropFaces(String filePath) async {
   try {
-    final img.Image? originalImage = img.decodeImage(imageBytes);
-    
+    final img.Image? originalImage = img.decodeImage(File(filePath).readAsBytesSync());
     if (originalImage == null) {
       throw Exception('Failed to decode image');
     }
 
+    // if (originalImage == null) {
+    //   throw Exception('Failed to decode image');
+    // }
+
     // Detect faces
-    final inputImage = InputImage.fromBytes(
-      bytes: imageBytes,
-      metadata: InputImageMetadata(
-        size: Size(originalImage.width.toDouble(), originalImage.height.toDouble()),
-        rotation: InputImageRotation.rotation0deg,
-        format: Platform.isAndroid 
-            ? InputImageFormat.yuv_420_888 // Android format
-            : InputImageFormat.bgra8888, // iOS format
-        bytesPerRow: originalImage.width * 4,
-      ),
-    );
+    // final inputImage = InputImage.fromBytes(
+    //   bytes: imageBytes,
+    //   metadata: InputImageMetadata(
+    //     size: Size(originalImage.width.toDouble(),
+    //         originalImage.height.toDouble()),
+    //     rotation: InputImageRotation.rotation0deg,
+    //     format: Platform.isAndroid
+    //         ? InputImageFormat.nv21 // Android format
+    //         : InputImageFormat.bgra8888, // iOS format
+    //     bytesPerRow: originalImage.width,
+    //   ),
+    // );
+    final inputImage = InputImage.fromFilePath(filePath);
     final faceDetector = FaceDetector(
       options: FaceDetectorOptions(
         enableLandmarks: false,
@@ -34,8 +39,9 @@ Future<List<Uint8List>> cropFaces(Uint8List imageBytes) async {
       ),
     );
 
-    final List<Face> faces = await faceDetector.processImage(inputImage);
-    
+    final List<Face> faces =
+        await faceDetector.processImage(inputImage);
+
     if (faces.isEmpty) {
       throw Exception('No faces detected in the image');
     }
