@@ -34,6 +34,7 @@ class ImageSimilarityPage extends StatefulWidget {
 
 class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   Interpreter? _interpreter;
+  Interpreter? faceInterpreter;
   final ImagePicker _picker = ImagePicker();
   List<double>? _queryFeature;
   List<SimilarImage> _similarImages = [];
@@ -54,6 +55,9 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   Future<void> loadModel(context) async {
     try {
       _interpreter = await Interpreter.fromAsset('assets/effecientnet.tflite');
+      faceInterpreter = await Interpreter.fromAsset('assets/facenet.tflite');
+      _interpreter!.allocateTensors();
+      faceInterpreter!.allocateTensors();
       print('Model loaded successfully');
     } catch (e) {
       print('Error loading model: $e');
@@ -64,6 +68,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   }
 
   Future<void> initializeDatabase() async {
+    // await deleteDatabase(join(await getDatabasesPath(), 'image_features.db'));
     _database = await openDatabase(
       join(await getDatabasesPath(), 'image_features.db'),
       onCreate: (db, version) {
@@ -91,13 +96,13 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
       const int pageSize = 50;
       bool hasMore = true;
 
-      while (hasMore) {
+      while (hasMore && page < 10) {
         List<AssetEntity> media = await recentAlbum.getAssetListPaged(
           page: page,
           size: pageSize,
         );
 
-        if (media.isEmpty || page > 2) {
+        if (media.isEmpty) {
           hasMore = false;
           break;
         }
@@ -130,6 +135,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
                 );
                 if (bytes != null) {
                   List<double> feature = await extractFeatureVector(bytes);
+
                   await storeFeatureInDatabase(asset.id, asset.id, feature);
                 }
               } finally {
@@ -160,39 +166,39 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     );
   }
 
-  Future<void> pickImage(BuildContext context) async {
-    try {
-      final XFile? imageFile =
-          await _picker.pickImage(source: ImageSource.gallery);
-      if (imageFile != null) {
-        final file = File(imageFile.path);
-        var bytes;
-        Uint8List? compressedBytes =
-            await FlutterImageCompress.compressWithFile(
-          file.path,
-          minWidth: 224,
-          minHeight: 224,
-          quality: 85,
-        );
-        if (compressedBytes != null) {
-          bytes = compressedBytes;
-        } else {
-          bytes = await file.readAsBytes();
-        }
-        setState(() {
-          _queryFeature = null;
-          _similarImages = [];
-        });
-        await loadModel(context);
-        _queryFeature = await extractFeatureVector(bytes);
-        findSimilarImages();
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: $e')),
-      );
-    }
-  }
+  // Future<void> pickImage(BuildContext context) async {
+  //   try {
+  //     final XFile? imageFile =
+  //         await _picker.pickImage(source: ImageSource.gallery);
+  //     if (imageFile != null) {
+  //       final file = File(imageFile.path);
+  //       var bytes;
+  //       Uint8List? compressedBytes =
+  //           await FlutterImageCompress.compressWithFile(
+  //         file.path,
+  //         minWidth: 224,
+  //         minHeight: 224,
+  //         quality: 85,
+  //       );
+  //       if (compressedBytes != null) {
+  //         bytes = compressedBytes;
+  //       } else {
+  //         bytes = await file.readAsBytes();
+  //       }
+  //       setState(() {
+  //         _queryFeature = null;
+  //         _similarImages = [];
+  //       });
+  //       await loadModel(context);
+  //       _queryFeature = await extractFeatureVector(bytes);
+  //       findSimilarImages();
+  //     }
+  //   } catch (e) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Error picking image: $e')),
+  //     );
+  //   }
+  // }
 
   Float32List preprocessImage(Uint8List imageData) {
     img.Image? originalImage = img.decodeImage(imageData);
@@ -219,13 +225,14 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   Future<List<double>> extractFeatureVector(Uint8List imageData) async {
     Float32List input = preprocessImage(imageData);
     var inputTensor = input.buffer.asFloat32List().reshape([1, 224, 224, 3]);
-    var outputBuffer = List.filled(1280, 0.0).reshape([1, 1280]);
+    var outputBuffer = List.filled(1000, 0.0).reshape([1, 1000]);
+
     try {
       _interpreter!.run(inputTensor, outputBuffer);
     } on Exception catch (e) {
       Fluttertoast.showToast(msg: "Error: $e");
     }
-
+    // List<double> faceFeature = await extractFaceEmbeddings(input);
     List<double> features = List<double>.from(outputBuffer[0]);
     double maxVal = features.reduce(max);
     double minVal = features.reduce(min);
@@ -234,10 +241,14 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
       features = features.map((e) => (e - minVal) / (maxVal - minVal)).toList();
     }
 
+    // return features..addAll(faceFeature);
     return features;
   }
 
   double cosineSimilarity(List<double> vectorA, List<double> vectorB) {
+    if (vectorA.length != vectorB.length) {
+      throw Exception('Vectors must be of the same length');
+    }
     double dotProduct = 0.0;
     double normA = 0.0;
     double normB = 0.0;
@@ -252,6 +263,49 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     }
 
     return dotProduct / norm;
+  }
+
+  // Future<void> findSimilarImages() async {
+  //   if (_queryFeature == null) return;
+  //   List<Map<String, dynamic>> maps = await _database!.query('features');
+  //   List<SimilarImage> results = [];
+  //   for (var map in maps) {
+  //     List<double> feature =
+  //         (jsonDecode(map['feature']) as List).cast<double>();
+  //     double similarity = cosineSimilarity(_queryFeature!, feature);
+  //     if (similarity > 0.15) {
+  //       results.add(SimilarImage(path: map['path'], similarity: similarity));
+  //     }
+  //   }
+  //   results.sort((a, b) => b.similarity.compareTo(a.similarity));
+  //   setState(() {
+  //     _similarImages = results.take(10).toList();
+  //   });
+  // }
+
+  Future<List<double>> extractFaceEmbeddings(Float32List input) async {
+    // Load the face detection model
+
+    // Preprocess the image for face detection
+    // Float32List input = preprocessImage(imageData);
+    var inputTensor = input.buffer.asFloat32List().reshape([1, 224, 224, 3]);
+    var outputBuffer = List.filled(128, 0.0).reshape([1, 128]);
+
+    // Run the face detection model
+    faceInterpreter!.run(inputTensor, outputBuffer);
+
+    // Extract the face embeddings
+    List<double> faceEmbeddings = List<double>.from(outputBuffer[0]);
+
+    // Normalize the face embeddings
+    double maxVal = faceEmbeddings.reduce(max);
+    double minVal = faceEmbeddings.reduce(min);
+    if (maxVal != minVal) {
+      faceEmbeddings =
+          faceEmbeddings.map((e) => (e - minVal) / (maxVal - minVal)).toList();
+    }
+
+    return faceEmbeddings;
   }
 
   Future<void> findSimilarImages() async {
@@ -270,6 +324,40 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     setState(() {
       _similarImages = results.take(10).toList();
     });
+  }
+
+  Future<void> pickImage(BuildContext context) async {
+    try {
+      final XFile? imageFile =
+          await _picker.pickImage(source: ImageSource.gallery);
+      if (imageFile != null) {
+        final file = File(imageFile.path);
+        Uint8List bytes;
+        Uint8List? compressedBytes =
+            await FlutterImageCompress.compressWithFile(
+          file.path,
+          minWidth: 224,
+          minHeight: 224,
+          quality: 85,
+        );
+        if (compressedBytes != null) {
+          bytes = compressedBytes;
+        } else {
+          bytes = await file.readAsBytes();
+        }
+        setState(() {
+          _queryFeature = null;
+          _similarImages = [];
+        });
+        _queryFeature = await extractFeatureVector(bytes);
+
+        findSimilarImages();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error picking image: $e')),
+      );
+    }
   }
 
   @override
