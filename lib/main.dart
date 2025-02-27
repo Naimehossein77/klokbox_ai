@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:klokbox_ai/face_recognition.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 import 'package:photo_manager/photo_manager.dart';
@@ -68,7 +69,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   }
 
   Future<void> initializeDatabase() async {
-    // await deleteDatabase(join(await getDatabasesPath(), 'image_features.db'));
+    await deleteDatabase(join(await getDatabasesPath(), 'image_features.db'));
     _database = await openDatabase(
       join(await getDatabasesPath(), 'image_features.db'),
       onCreate: (db, version) {
@@ -135,8 +136,14 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
                 );
                 if (bytes != null) {
                   List<double> feature = await extractFeatureVector(bytes);
-
                   await storeFeatureInDatabase(asset.id, asset.id, feature);
+                  List<Uint8List> faceImages = await cropFaces(bytes);
+                  for (int i = 0; i < faceImages.length; i++) {
+                    List<double> faceFeature =
+                        await extractFeatureVector(faceImages[i]);
+                    await storeFeatureInDatabase(
+                        '${asset.id}_face_$i', asset.id, faceFeature);
+                  }
                 }
               } finally {
                 if (await file.exists()) {
@@ -350,6 +357,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
           _similarImages = [];
         });
         _queryFeature = await extractFeatureVector(bytes);
+        
 
         findSimilarImages();
       }

@@ -36,6 +36,7 @@ dependencies:
   sqflite: 
   photo_manager:
   fluttertoast: 
+  google_mlkit_face_detection: ^0.12.0
   # heic_to_jpg:
 
 
