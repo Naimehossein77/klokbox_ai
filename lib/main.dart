@@ -14,6 +14,8 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
+import 'box_screen.dart';
+
 void main() {
   runApp(MyApp());
 }
@@ -30,8 +32,7 @@ class MyApp extends StatelessWidget {
 
 class ImageSimilarityPage extends StatefulWidget {
   @override
-  _ImageSimilarityPageState createState() =>
-      _ImageSimilarityPageState();
+  _ImageSimilarityPageState createState() => _ImageSimilarityPageState();
 }
 
 class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
@@ -39,8 +40,9 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   Interpreter? faceInterpreter;
   final ImagePicker _picker = ImagePicker();
   List<double>? _queryFeature;
-  List<double>? _faceFeature;
+
   List<SimilarImage> _similarImages = [];
+  Map<int, List<SimilarImage>> _faceSimilarImages = {};
   Database? _database;
   int _processed = 0;
 
@@ -57,10 +59,8 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
 
   Future<void> loadModel(context) async {
     try {
-      _interpreter =
-          await Interpreter.fromAsset('assets/effecientnet.tflite');
-      faceInterpreter =
-          await Interpreter.fromAsset('assets/facenet.tflite');
+      _interpreter = await Interpreter.fromAsset('assets/effecientnet.tflite');
+      faceInterpreter = await Interpreter.fromAsset('assets/facenet.tflite');
       _interpreter!.allocateTensors();
       faceInterpreter!.allocateTensors();
       print('Model loaded successfully');
@@ -73,8 +73,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   }
 
   Future<void> initializeDatabase() async {
-    await deleteDatabase(
-        join(await getDatabasesPath(), 'image_features.db'));
+    await deleteDatabase(join(await getDatabasesPath(), 'image_features.db'));
     _database = await openDatabase(
       join(await getDatabasesPath(), 'image_features.db'),
       onCreate: (db, version) {
@@ -94,8 +93,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     final PermissionState permission =
         await PhotoManager.requestPermissionExtend();
     if (permission.isAuth) {
-      List<AssetPathEntity> albums =
-          await PhotoManager.getAssetPathList(
+      List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
         type: RequestType.image,
       );
 
@@ -119,8 +117,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
 
         for (var asset in media) {
           try {
-            List<Map<String, dynamic>> existingFeature =
-                await _database!.query(
+            List<Map<String, dynamic>> existingFeature = await _database!.query(
               'features',
               where: 'id = ?',
               whereArgs: [asset.id],
@@ -139,25 +136,22 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
 
             if (file != null) {
               try {
-                Uint8List? bytes =
-                    await FlutterImageCompress.compressWithFile(
+                Uint8List? bytes = await FlutterImageCompress.compressWithFile(
                   file.path,
                   minWidth: 224,
                   minHeight: 224,
                   quality: 85,
                 );
                 if (bytes != null) {
-                  List<double> feature =
-                      await extractFeatureVector(bytes);
-                  await storeFeatureInDatabase(
-                      asset.id, asset.id, feature);
-                  List<Uint8List> faceImages =
-                      await cropFaces(bytes);
+                  List<double> feature = await extractFeatureVector(bytes);
+                  await storeFeatureInDatabase(asset.id, asset.id, feature);
+
+                  //TODO: This block of code is for face recognition
+                  List<Uint8List> faceImages = await cropFaces(bytes);
 
                   for (int i = 0; i < faceImages.length; i++) {
-                    List<double> faceFeature =
-                        await extractFaceEmbeddings(
-                            preprocessImage(faceImages[i]));
+                    List<double> faceFeature = await extractFaceEmbeddings(
+                        preprocessImage(faceImages[i]));
                     print(faceFeature);
                     await storeFaceFeatureInDB(
                         '${asset.id}_face_$i', asset.id, faceFeature);
@@ -165,13 +159,12 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
                 }
               } finally {
                 if (await file.exists()) {
-                  // await file.delete();
+                  await file.delete();
                 }
               }
             }
           } catch (e) {
-            print(
-                'Error processing image ${(await asset.file)!.path}: $e');
+            print('Error processing image ${(await asset.file)!.path}: $e');
             continue;
           }
         }
@@ -223,11 +216,9 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     return Float32List.fromList(imageAsList);
   }
 
-  Future<List<double>> extractFeatureVector(
-      Uint8List imageData) async {
+  Future<List<double>> extractFeatureVector(Uint8List imageData) async {
     Float32List input = preprocessImage(imageData);
-    var inputTensor =
-        input.buffer.asFloat32List().reshape([1, 224, 224, 3]);
+    var inputTensor = input.buffer.asFloat32List().reshape([1, 224, 224, 3]);
     var outputBuffer = List.filled(1000, 0.0).reshape([1, 1000]);
 
     try {
@@ -241,9 +232,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     double minVal = features.reduce(min);
 
     if (maxVal != minVal) {
-      features = features
-          .map((e) => (e - minVal) / (maxVal - minVal))
-          .toList();
+      features = features.map((e) => (e - minVal) / (maxVal - minVal)).toList();
     }
 
     // return features..addAll(faceFeature);
@@ -251,8 +240,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     return features;
   }
 
-  double cosineSimilarity(
-      List<double> vectorA, List<double> vectorB) {
+  double cosineSimilarity(List<double> vectorA, List<double> vectorB) {
     if (vectorA.length != vectorB.length) {
       throw Exception('Vectors must be of the same length');
     }
@@ -272,18 +260,16 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     return dotProduct / norm;
   }
 
-  Future<List<double>> extractFaceEmbeddings(
-      Float32List input) async {
+  Future<List<double>> extractFaceEmbeddings(Float32List input) async {
     // Load the face detection model
 
     // Preprocess the image for face detection
     // Float32List input = preprocessImage(imageData);
-    var inputTensor =
-        input.buffer.asFloat32List().reshape([1, 224, 224, 3]);
-    var outputBuffer = List.filled(128, 0.0).reshape([1, 128]);
+    var inputTensor = input.buffer.asFloat32List().reshape([1, 224, 224, 3]);
+    var outputBuffer = List.filled(1000, 0.0).reshape([1, 1000]);
 
     // Run the face detection model
-    faceInterpreter!.run(inputTensor, outputBuffer);
+    _interpreter!.run(inputTensor, outputBuffer);
 
     // Extract the face embeddings
     List<double> faceEmbeddings = List<double>.from(outputBuffer[0]);
@@ -292,9 +278,8 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     double maxVal = faceEmbeddings.reduce(max);
     double minVal = faceEmbeddings.reduce(min);
     if (maxVal != minVal) {
-      faceEmbeddings = faceEmbeddings
-          .map((e) => (e - minVal) / (maxVal - minVal))
-          .toList();
+      faceEmbeddings =
+          faceEmbeddings.map((e) => (e - minVal) / (maxVal - minVal)).toList();
     }
 
     return faceEmbeddings;
@@ -302,22 +287,43 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
 
   Future<void> findSimilarImages() async {
     if (_queryFeature == null) return;
-    List<Map<String, dynamic>> maps =
-        await _database!.query('features');
+    List<Map<String, dynamic>> maps = await _database!.query('features');
     List<SimilarImage> results = [];
     for (var map in maps) {
       List<double> feature =
           (jsonDecode(map['feature']) as List).cast<double>();
       double similarity = cosineSimilarity(_queryFeature!, feature);
-      if (similarity > 0.15) {
-        results.add(
-            SimilarImage(path: map['path'], similarity: similarity));
+      if (similarity > 0.50) {
+        results.add(SimilarImage(path: map['path'], similarity: similarity));
       }
     }
     results.sort((a, b) => b.similarity.compareTo(a.similarity));
     setState(() {
       _similarImages = results.take(10).toList();
     });
+  }
+
+  Future<List<SimilarImage>> findSimilarFaceImages(
+      List<double> faceFeature) async {
+    List<Map<String, dynamic>> maps = await _database!.query('face_features');
+    List<SimilarImage> results = [];
+    for (var map in maps) {
+      List<double> feature =
+          (jsonDecode(map['feature']) as List).cast<double>();
+      double similarity = cosineSimilarity(faceFeature, feature);
+      if (similarity > 0.90) {
+        results.add(SimilarImage(path: map['path'], similarity: similarity));
+      }
+    }
+    results.sort((a, b) => b.similarity.compareTo(a.similarity));
+    // setState(() {
+    //   _similarImages = results.take(10).toList();
+    // });
+    // return results.toSet().toList();
+    final uniqueResults = results.toSet().toList();
+    final uniqueById =
+        {for (var img in uniqueResults) img.path: img}.values.toList();
+    return uniqueById;
   }
 
   Future<void> pickImage(BuildContext context) async {
@@ -341,11 +347,17 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
         }
         setState(() {
           _queryFeature = null;
-          _faceFeature = null;
+          _faceSimilarImages = {};
           _similarImages = [];
         });
         _queryFeature = await extractFeatureVector(bytes);
-        
+        List<Uint8List> faceImages = await cropFaces(bytes);
+        for (int i = 0; i < faceImages.length; i++) {
+          List<double> faceFeature =
+              await extractFaceEmbeddings(preprocessImage(faceImages[i]));
+          print(faceFeature);
+          _faceSimilarImages[i] = (await findSimilarFaceImages(faceFeature));
+        }
         findSimilarImages();
       }
     } catch (e) {
@@ -380,21 +392,76 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
             child: Text("Pick an Image"),
           ),
           SizedBox(height: 20),
-          Expanded(
-            child: _similarImages.isEmpty
-                ? Center(
-                    child: Text(
-                        "No similar images found. ${_similarImages.length}"))
-                : ListView.builder(
-                    itemCount: _similarImages.length,
-                    itemBuilder: (context, index) {
-                      // File imageFile = File(_similarImages[index].path);
-                      return CardItem(
-                          similarImage: _similarImages[index]);
-                      // Text(_similarImages[index].path);
-                    },
-                  ),
+          // Expanded(
+          //   child: _similarImages.isEmpty
+          //       ? Center(
+          //           child: Text(
+          //               "No similar images found. ${_similarImages.length}"))
+          //       : GridView.builder(
+          //           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          //             crossAxisCount: 2,
+          //             crossAxisSpacing: 4.0,
+          //             mainAxisSpacing: 4.0,
+          //           ),
+          //           itemCount: _similarImages.length,
+          //           itemBuilder: (context, index) {
+          //             return CardItem(similarImage: _similarImages[index]);
+          //           },
+          //         ),
+          // ),
+          Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Detected Objec box: ',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              )),
+          _similarImages.isNotEmpty
+              ? GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            BoxScreen(similarImages: _similarImages),
+                      ),
+                    );
+                  },
+                  child: CardItem(similarImage: _similarImages[0]),
+                )
+              : Center(
+                  child: Text("No similar images found."),
+                ),
+          SizedBox(
+            height: 20,
           ),
+          Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Detected faces: ',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              )),
+
+          Expanded(
+            child: ListView.builder(
+              itemCount: _faceSimilarImages.length,
+              itemBuilder: (context, index) {
+                int faceIndex = _faceSimilarImages.keys.elementAt(index);
+                List<SimilarImage> faceImages = _faceSimilarImages[faceIndex]!;
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            BoxScreen(similarImages: faceImages),
+                      ),
+                    );
+                  },
+                  child: CardItem(similarImage: _similarImages[0]),
+                );
+              },
+            ),
+          )
         ],
       ),
     );
@@ -432,24 +499,30 @@ class CardItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      title: FutureBuilder(
-          future: getFilePathFromId(_similarImage.path),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.done) {
-              File? imageFile = snapshot.data as File?;
-              if (imageFile != null) {
-                return Image.file(imageFile);
+    return Column(children: [
+      Center(
+        child: FutureBuilder(
+            future: getFilePathFromId(_similarImage.path),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.done) {
+                File? imageFile = snapshot.data as File?;
+                if (imageFile != null) {
+                  return Image.file(
+                    imageFile,
+                    fit: BoxFit.cover,
+                    height: 100,
+                    width: 100,
+                  );
+                } else {
+                  return Text("Image not found");
+                }
               } else {
-                return Text("Image not found");
+                return Center(child: CircularProgressIndicator());
               }
-            } else {
-              return CircularProgressIndicator();
-            }
-          }),
-      subtitle: Text(
-          "Similarity: ${_similarImage.similarity.toStringAsFixed(2)}"),
-    );
+            }),
+      ),
+      Text("Similarity: ${_similarImage.similarity.toStringAsFixed(2)}"),
+    ]);
   }
 }
 
@@ -465,8 +538,7 @@ extension ListReshape on List<double> {
       int outer = dims[0];
       int inner = dims[1];
       if (this.length != outer * inner) {
-        throw Exception(
-            "Cannot reshape list: incompatible dimensions");
+        throw Exception("Cannot reshape list: incompatible dimensions");
       }
       List<List<double>> result = [];
       for (int i = 0; i < outer; i++) {
@@ -479,8 +551,7 @@ extension ListReshape on List<double> {
       int inner1 = dims[2];
       int inner2 = dims[3];
       if (this.length != outer1 * outer2 * inner1 * inner2) {
-        throw Exception(
-            "Cannot reshape list: incompatible dimensions");
+        throw Exception("Cannot reshape list: incompatible dimensions");
       }
       List<List<List<List<double>>>> result = [];
       for (int i = 0; i < outer1; i++) {
@@ -502,8 +573,7 @@ extension ListReshape on List<double> {
       }
       return result;
     } else {
-      throw Exception(
-          "Only 2D and 4D reshape are supported in this example");
+      throw Exception("Only 2D and 4D reshape are supported in this example");
     }
   }
 }

@@ -53,7 +53,8 @@ Future<List<Uint8List>> cropFaces(Uint8List imageBytes) async {
     print('Face detection took: ${stopwatch.elapsedMilliseconds} ms');
 
     if (faces.isEmpty) {
-      throw Exception('No faces detected in the image');
+      // throw Exception('No faces detected in the image');
+      print('No Faces detected in ${file.path}');
     } else {
       print('Detected ${faces.length} faces');
     }
