@@ -37,7 +37,10 @@ dependencies:
   photo_manager:
   fluttertoast: 
   google_mlkit_face_detection: ^0.11.0
-  # heic_to_jpg:
+  # opencv_4: 
+  # flutter_mediapipe: ^0.0.7
+  # google_mediapipe_face_detection: ^0.0.2
+
 
 
   # The following adds the Cupertino Icons font to your application.
