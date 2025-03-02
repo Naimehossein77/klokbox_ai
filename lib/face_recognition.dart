@@ -1,6 +1,7 @@
 import 'dart:developer';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
 
@@ -54,11 +55,11 @@ Future<List<Uint8List>> cropFaces(Uint8List imageBytes) async {
     final List<Face> faces =
         await faceDetector.processImage(inputImage);
     stopwatch.stop();
-    print('Face detection took: ${stopwatch.elapsedMilliseconds} ms');
+    debugPrint('Face detection took: ${stopwatch.elapsedMilliseconds} ms');
 
     if (faces.isEmpty) {
       // throw Exception('No faces detected in the image');
-      print('No Faces detected in ${file.path}');
+      log('No Faces detected in ${file.path}');
     } else {
       log('Detected ${faces.length} faces');
     }
@@ -67,10 +68,10 @@ Future<List<Uint8List>> cropFaces(Uint8List imageBytes) async {
     List<Uint8List> croppedFaces = [];
     for (Face face in faces) {
       // Get face bounding box
-      int left = face.boundingBox.left.round() + 10;
-      int top = face.boundingBox.top.round() + 10;
-      int width = face.boundingBox.width.round() + 10;
-      int height = face.boundingBox.height.round() + 10;
+      int left = face.boundingBox.left.round();
+      int top = face.boundingBox.top.round();
+      int width = face.boundingBox.width.round();
+      int height = face.boundingBox.height.round();
 
       // Ensure coordinates are within image bounds
       left = left.clamp(0, originalImage.width - 1);
@@ -88,7 +89,7 @@ Future<List<Uint8List>> cropFaces(Uint8List imageBytes) async {
       );
 
       // Convert cropped image to bytes
-      final List<int> croppedBytes = img.encodeJpg(croppedImage);
+      final List<int> croppedBytes = img.encodeJpg(croppedImage, quality: 100);
       croppedFaces.add(Uint8List.fromList(croppedBytes));
     }
     return croppedFaces;
