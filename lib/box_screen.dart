@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:klokbox_ai/main.dart';
 
+import 'ffmpeg.dart';
+
 class BoxScreen extends StatelessWidget {
   final List<SimilarImage> similarImages;
 
@@ -11,6 +13,15 @@ class BoxScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('Box Screen'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.create),
+            onPressed: () {
+              // Create video from similar images
+              createVideo(similarImages.map((image) => image.path).toList());
+            },
+          ),
+        ],
       ),
       body: GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

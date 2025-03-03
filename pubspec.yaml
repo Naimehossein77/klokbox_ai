@@ -38,6 +38,10 @@ dependencies:
   fluttertoast: 
   google_mlkit_face_detection: ^0.11.0
   heif_converter: 
+  ffmpeg_cli: ^0.3.0
+  path_provider: ^2.1.5
+  permission_handler: 
+  ffmpeg_kit_flutter: ^6.0.3
   # opencv_4: 
   # flutter_mediapipe: ^0.0.7
   # google_mediapipe_face_detection: ^0.0.2
