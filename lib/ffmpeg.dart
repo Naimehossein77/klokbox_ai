@@ -63,14 +63,14 @@ Future<void> createVideo(List<String> imagePaths) async {
   ffmpegCommand += '-filter_complex "';
   for (int i = 0; i < imagePaths.length; i++) {
     ffmpegCommand +=
-        '[$i:v]scale=1920:1080:force_original_aspect_ratio=increase,setsar=1:1,crop=1920:1080[v$i];';
+        '[$i:v]scale=1280:720:force_original_aspect_ratio=increase,setsar=1:1,crop=1280:720[v$i];';
   }
   for (int i = 0; i < imagePaths.length; i++) {
     ffmpegCommand += '[v$i]';
   }
   ffmpegCommand +=
       'concat=n=${imagePaths.length}:v=1:a=0[outv]" -map "[outv]" ';
-  ffmpegCommand += '-pix_fmt yuv420p -y "$outputPath"';
+  ffmpegCommand += '-c:v mpeg4 -b:v 2M -pix_fmt yuv420p -y "$outputPath"';
 
   print("🔍 Running FFmpeg Command:\n$ffmpegCommand");
 

@@ -78,7 +78,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   }
 
   Future<void> initializeDatabase() async {
-    await deleteDatabase(join(await getDatabasesPath(), 'image_features.db'));
+    // await deleteDatabase(join(await getDatabasesPath(), 'image_features.db'));
     _database = await openDatabase(
       join(await getDatabasesPath(), 'image_features.db'),
       onCreate: (db, version) {
