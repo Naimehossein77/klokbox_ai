@@ -33,7 +33,8 @@ class MyApp extends StatelessWidget {
 
 class ImageSimilarityPage extends StatefulWidget {
   @override
-  _ImageSimilarityPageState createState() => _ImageSimilarityPageState();
+  _ImageSimilarityPageState createState() =>
+      _ImageSimilarityPageState();
 }
 
 class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
@@ -61,8 +62,10 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
 
   Future<void> loadModel(context) async {
     try {
-      _interpreter = await Interpreter.fromAsset('assets/effecientnet.tflite');
-      faceInterpreter = await Interpreter.fromAsset('assets/facenet_512.tflite');
+      _interpreter =
+          await Interpreter.fromAsset('assets/effecientnet.tflite');
+      faceInterpreter =
+          await Interpreter.fromAsset('assets/facenet_512.tflite');
       _interpreter!.allocateTensors();
       faceInterpreter!.allocateTensors();
       print('Model loaded successfully');
@@ -75,7 +78,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   }
 
   Future<void> initializeDatabase() async {
-    await deleteDatabase(join(await getDatabasesPath(), 'image_features.db'));
+    // await deleteDatabase(join(await getDatabasesPath(), 'image_features.db'));
     _database = await openDatabase(
       join(await getDatabasesPath(), 'image_features.db'),
       onCreate: (db, version) {
@@ -95,7 +98,8 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     final PermissionState permission =
         await PhotoManager.requestPermissionExtend();
     if (permission.isAuth) {
-      List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
+      List<AssetPathEntity> albums =
+          await PhotoManager.getAssetPathList(
         type: RequestType.image,
       );
 
@@ -106,7 +110,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
       const int pageSize = 50;
       bool hasMore = true;
 
-      while (hasMore && page < 5) {
+      while (hasMore && page < 2) {
         List<AssetEntity> media = await recentAlbum.getAssetListPaged(
           page: page,
           size: pageSize,
@@ -119,7 +123,8 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
 
         for (var asset in media) {
           try {
-            List<Map<String, dynamic>> existingFeature = await _database!.query(
+            List<Map<String, dynamic>> existingFeature =
+                await _database!.query(
               'features',
               where: 'id = ?',
               whereArgs: [asset.id],
@@ -138,14 +143,15 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
 
             if (file != null) {
               try {
-                Uint8List bytes = await FlutterImageCompress.compressWithFile(
-                      file.path,
-                      minWidth: 1024,
-                      minHeight: 1024,
-                      quality: 70,
-                      format: CompressFormat.jpeg,
-                    ) ??
-                    await file.readAsBytes();
+                Uint8List bytes =
+                    await FlutterImageCompress.compressWithFile(
+                          file.path,
+                          minWidth: 1024,
+                          minHeight: 1024,
+                          quality: 70,
+                          format: CompressFormat.jpeg,
+                        ) ??
+                        await file.readAsBytes();
                 // if (file.path.endsWith('.heic') ||
                 //     file.path.endsWith('.HEIC')) {
                 //   // Extract the .heic file
@@ -167,8 +173,10 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
                 //   bytes = await file.readAsBytes();
                 // }
                 if (bytes != null) {
-                  List<double> feature = await extractFeatureVector(bytes);
-                  await storeFeatureInDatabase(asset.id, asset.id, feature);
+                  List<double> feature =
+                      await extractFeatureVector(bytes);
+                  await storeFeatureInDatabase(
+                      asset.id, asset.id, feature);
 
                   //TODO: This block of code is for face recognition
                   List<Uint8List> faceImages = await cropFaces(bytes);
@@ -188,7 +196,8 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
               }
             }
           } catch (e) {
-            print('Error processing image ${(await asset.file)!.path}: $e');
+            print(
+                'Error processing image ${(await asset.file)!.path}: $e');
             continue;
           }
         }
@@ -240,10 +249,12 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     return Float32List.fromList(imageAsList);
   }
 
-  Future<List<double>> extractFeatureVector(Uint8List imageData) async {
+  Future<List<double>> extractFeatureVector(
+      Uint8List imageData) async {
     Float32List input = preprocessImage(imageData);
     print(input.buffer.asFloat32List());
-    var inputTensor = input.buffer.asFloat32List().reshape([1, 224, 224, 3]);
+    var inputTensor =
+        input.buffer.asFloat32List().reshape([1, 224, 224, 3]);
     var outputBuffer = List.filled(1000, 0.0).reshape([1, 1000]);
     print('inputTensor length: ${inputTensor.length}');
     print('outputBuffer length: ${outputBuffer.length}');
@@ -258,7 +269,9 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     double minVal = features.reduce(min);
 
     if (maxVal != minVal) {
-      features = features.map((e) => (e - minVal) / (maxVal - minVal)).toList();
+      features = features
+          .map((e) => (e - minVal) / (maxVal - minVal))
+          .toList();
     }
 
     // return features..addAll(faceFeature);
@@ -266,7 +279,8 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     return features;
   }
 
-  Future<List<double>> extractFaceEmbeddings(Uint8List imageData) async {
+  Future<List<double>> extractFaceEmbeddings(
+      Uint8List imageData) async {
     if (mounted) {
       setState(() {
         _imageBytes = imageData;
@@ -274,12 +288,14 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     }
     // Preprocess the image for face detection
     Uint8List uint8ListInput = img
-        .copyResize(img.decodeImage(imageData)!, width: 160, height: 160)
+        .copyResize(img.decodeImage(imageData)!,
+            width: 160, height: 160)
         .getBytes();
     Float32List input = Float32List.fromList(
         uint8ListInput.map((e) => e.toDouble() / 255.0).toList());
     // print(input.buffer.asFloat32List());
-    var inputTensor = input.buffer.asFloat32List().reshape([1, 160, 160, 3]);
+    var inputTensor =
+        input.buffer.asFloat32List().reshape([1, 160, 160, 3]);
     print('face reshape: ${inputTensor}');
     var outputBuffer = List.filled(512, 0.0).reshape([1, 512]);
 
@@ -293,8 +309,9 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     double maxVal = faceEmbeddings.reduce(max);
     double minVal = faceEmbeddings.reduce(min);
     if (maxVal != minVal) {
-      faceEmbeddings =
-          faceEmbeddings.map((e) => (e - minVal) / (maxVal - minVal)).toList();
+      faceEmbeddings = faceEmbeddings
+          .map((e) => (e - minVal) / (maxVal - minVal))
+          .toList();
     }
 
     return faceEmbeddings;
@@ -302,14 +319,16 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
 
   Future<void> findSimilarImages() async {
     if (_queryFeature == null) return;
-    List<Map<String, dynamic>> maps = await _database!.query('features');
+    List<Map<String, dynamic>> maps =
+        await _database!.query('features');
     List<SimilarImage> results = [];
     for (var map in maps) {
       List<double> feature =
           (jsonDecode(map['feature']) as List).cast<double>();
       double similarity = cosineSimilarity(_queryFeature!, feature);
       if (similarity > 0.50) {
-        results.add(SimilarImage(path: map['path'], similarity: similarity));
+        results.add(
+            SimilarImage(path: map['path'], similarity: similarity));
       }
     }
     results.sort((a, b) => b.similarity.compareTo(a.similarity));
@@ -318,7 +337,8 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     });
   }
 
-  double cosineSimilarity(List<double> vectorA, List<double> vectorB) {
+  double cosineSimilarity(
+      List<double> vectorA, List<double> vectorB) {
     if (vectorA.length != vectorB.length) {
       throw Exception('Vectors must be of the same length');
     }
@@ -340,14 +360,16 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
 
   Future<List<SimilarImage>> findSimilarFaceImages(
       List<double> faceFeature) async {
-    List<Map<String, dynamic>> maps = await _database!.query('face_features');
+    List<Map<String, dynamic>> maps =
+        await _database!.query('face_features');
     List<SimilarImage> results = [];
     for (var map in maps) {
       List<double> feature =
           (jsonDecode(map['feature']) as List).cast<double>();
       double similarity = cosineSimilarity(faceFeature, feature);
       if (similarity > 0.59) {
-        results.add(SimilarImage(path: map['path'], similarity: similarity));
+        results.add(
+            SimilarImage(path: map['path'], similarity: similarity));
       }
     }
     results.sort((a, b) => b.similarity.compareTo(a.similarity));
@@ -356,8 +378,9 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     // });
     // return results.toSet().toList();
     final uniqueResults = results.toSet().toList();
-    final uniqueById =
-        {for (var img in uniqueResults) img.path: img}.values.toList();
+    final uniqueById = {for (var img in uniqueResults) img.path: img}
+        .values
+        .toList();
     return uniqueById;
   }
 
@@ -402,9 +425,11 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
         _queryFeature = await extractFeatureVector(bytes);
         List<Uint8List> faceImages = await cropFaces(bytes);
         for (int i = 0; i < faceImages.length; i++) {
-          List<double> faceFeature = await extractFaceEmbeddings(faceImages[i]);
+          List<double> faceFeature =
+              await extractFaceEmbeddings(faceImages[i]);
           print(faceFeature);
-          _faceSimilarImages[i] = (await findSimilarFaceImages(faceFeature));
+          _faceSimilarImages[i] =
+              (await findSimilarFaceImages(faceFeature));
         }
         findSimilarImages();
       }
@@ -498,8 +523,10 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
             child: ListView.builder(
               itemCount: _faceSimilarImages.length,
               itemBuilder: (context, index) {
-                int faceIndex = _faceSimilarImages.keys.elementAt(index);
-                List<SimilarImage> faceImages = _faceSimilarImages[faceIndex]!;
+                int faceIndex =
+                    _faceSimilarImages.keys.elementAt(index);
+                List<SimilarImage> faceImages =
+                    _faceSimilarImages[faceIndex]!;
                 return GestureDetector(
                   onTap: () {
                     Navigator.push(
@@ -574,7 +601,8 @@ class CardItem extends StatelessWidget {
               }
             }),
       ),
-      Text("Similarity: ${_similarImage.similarity.toStringAsFixed(2)}"),
+      Text(
+          "Similarity: ${_similarImage.similarity.toStringAsFixed(2)}"),
     ]);
   }
 }
@@ -591,7 +619,8 @@ extension ListReshape on List<double> {
       int outer = dims[0];
       int inner = dims[1];
       if (length != outer * inner) {
-        throw Exception("Cannot reshape list: incompatible dimensions 2D");
+        throw Exception(
+            "Cannot reshape list: incompatible dimensions 2D");
       }
       List<List<double>> result = [];
       for (int i = 0; i < outer; i++) {
@@ -604,7 +633,8 @@ extension ListReshape on List<double> {
       int inner1 = dims[2];
       int inner2 = dims[3];
       if (length != outer1 * outer2 * inner1 * inner2) {
-        throw Exception("Cannot reshape list: incompatible dimensions 4D");
+        throw Exception(
+            "Cannot reshape list: incompatible dimensions 4D");
       }
       List<List<List<List<double>>>> result = [];
       for (int i = 0; i < outer1; i++) {
@@ -626,7 +656,8 @@ extension ListReshape on List<double> {
       }
       return result;
     } else {
-      throw Exception("Only 2D and 4D reshape are supported in this example");
+      throw Exception(
+          "Only 2D and 4D reshape are supported in this example");
     }
   }
 }

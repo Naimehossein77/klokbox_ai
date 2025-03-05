@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:klokbox_ai/main.dart';
+import 'package:photo_manager/photo_manager.dart';
 
 import 'ffmpeg.dart';
 
@@ -16,9 +17,16 @@ class BoxScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: Icon(Icons.create),
-            onPressed: () {
+            onPressed: () async {
               // Create video from similar images
-              createVideo(similarImages.map((image) => image.path).toList());
+              List<String> imagePaths = [];
+              for (var image in similarImages) {
+                String? path = await findImagePathFromId(image.path);
+                if (path != null) {
+                  imagePaths.add(path);
+                }
+              }
+              createVideo(imagePaths);
             },
           ),
         ],
@@ -35,5 +43,20 @@ class BoxScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Future<String?> findImagePathFromId(String imageId) async {
+    final List<AssetPathEntity> albums =
+        await PhotoManager.getAssetPathList();
+    for (final album in albums) {
+      final List<AssetEntity> images = await album.getAssetListRange(
+          start: 0, end: await album.assetCountAsync);
+      for (final image in images) {
+        if (image.id == imageId) {
+          return (await image.file)?.path;
+        }
+      }
+    }
+    return null;
   }
 }
