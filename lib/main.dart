@@ -110,7 +110,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
       const int pageSize = 50;
       bool hasMore = true;
 
-      while (hasMore && page < 2) {
+      while (hasMore && page < 4) {
         List<AssetEntity> media = await recentAlbum.getAssetListPaged(
           page: page,
           size: pageSize,
