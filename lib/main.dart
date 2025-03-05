@@ -62,7 +62,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   Future<void> loadModel(context) async {
     try {
       _interpreter = await Interpreter.fromAsset('assets/effecientnet.tflite');
-      faceInterpreter = await Interpreter.fromAsset('assets/facenet.tflite');
+      faceInterpreter = await Interpreter.fromAsset('assets/facenet_512.tflite');
       _interpreter!.allocateTensors();
       faceInterpreter!.allocateTensors();
       print('Model loaded successfully');
@@ -75,7 +75,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
   }
 
   Future<void> initializeDatabase() async {
-    // await deleteDatabase(join(await getDatabasesPath(), 'image_features.db'));
+    await deleteDatabase(join(await getDatabasesPath(), 'image_features.db'));
     _database = await openDatabase(
       join(await getDatabasesPath(), 'image_features.db'),
       onCreate: (db, version) {
@@ -143,7 +143,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
                       minWidth: 1024,
                       minHeight: 1024,
                       quality: 70,
-                      format: CompressFormat.png,
+                      format: CompressFormat.jpeg,
                     ) ??
                     await file.readAsBytes();
                 // if (file.path.endsWith('.heic') ||
@@ -183,7 +183,7 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
                 }
               } finally {
                 if (await file.exists()) {
-                  await file.delete();
+                  // await file.delete();
                 }
               }
             }
@@ -274,14 +274,14 @@ class _ImageSimilarityPageState extends State<ImageSimilarityPage> {
     }
     // Preprocess the image for face detection
     Uint8List uint8ListInput = img
-        .copyResize(img.decodeImage(imageData)!, width: 112, height: 112)
+        .copyResize(img.decodeImage(imageData)!, width: 160, height: 160)
         .getBytes();
     Float32List input = Float32List.fromList(
         uint8ListInput.map((e) => e.toDouble() / 255.0).toList());
     // print(input.buffer.asFloat32List());
-    var inputTensor = input.buffer.asFloat32List().reshape([1, 112, 112, 3]);
+    var inputTensor = input.buffer.asFloat32List().reshape([1, 160, 160, 3]);
     print('face reshape: ${inputTensor}');
-    var outputBuffer = List.filled(128, 0.0).reshape([1, 128]);
+    var outputBuffer = List.filled(512, 0.0).reshape([1, 512]);
 
     // Run the face detection model
     faceInterpreter!.run(inputTensor, outputBuffer);

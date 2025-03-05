@@ -47,7 +47,7 @@ Future<List<Uint8List>> cropFaces(Uint8List imageBytes) async {
         enableClassification: false,
         enableTracking: false,
         performanceMode: FaceDetectorMode.accurate,
-        minFaceSize: 0.3,
+        minFaceSize: 0.2,
       ),
     );
 
